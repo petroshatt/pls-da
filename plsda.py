@@ -6,6 +6,7 @@ class PlsDa:
 
     def __init__(self, ncomps_pls=12, alpha=0.05, gamma=0.01):
 
+
         self.n_comps_pls = ncomps_pls
         self.n_comps_pca = 2
         self.alpha = alpha
@@ -27,6 +28,9 @@ class PlsDa:
         self.plsP = None
         self.plsT = None
 
+        self.YpredP = None
+        self.YpredT = None
+
     def fit(self, X, y):
         self.training_set = X
         self.training_classes = y
@@ -42,8 +46,7 @@ class PlsDa:
         self.plsT, self.plsP, self.plsQ, self.plsW = self.plsnipals(X, Y)
 
         Ypred = self.plsT @ self.plsQ.T
-        self.decomp(Ypred)
-
+        self.YpredT, self.YpredP, _ = self.decomp(Ypred)
 
     def preprocess(self, mode, XTest1):
         _, Nx = XTest1.shape
@@ -111,4 +114,18 @@ class PlsDa:
 
     def decomp(self, X):
         V, D, P = np.linalg.svd(X)
-        print(P)
+
+        D_diag = np.diag(D)
+        X_rows, X_cols = X.shape
+        D_rows, D_cols = D_diag.shape
+        d = np.zeros((X_rows - D_rows, X_cols))
+        D = np.concatenate((D_diag, d), axis=0)
+
+        P = np.transpose(P)
+
+        T = V @ D
+        T = T[:, :self.n_comps_pca]
+        P = P[:, :self.n_comps_pca]
+        Eig = D[:self.n_comps_pca, :self.n_comps_pca]
+
+        return T, P, Eig
