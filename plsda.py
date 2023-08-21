@@ -6,7 +6,6 @@ class PlsDa:
 
     def __init__(self, ncomps_pls=12, alpha=0.05, gamma=0.01):
 
-
         self.n_comps_pls = ncomps_pls
         self.n_comps_pca = 2
         self.alpha = alpha
@@ -30,27 +29,43 @@ class PlsDa:
 
         self.YpredP = None
         self.YpredT = None
+        self.centers = None
+        self.distances_soft = None
 
     def fit(self, X, y):
         self.training_set = X
         self.training_classes = y
 
         Y = pd.get_dummies(y, columns=['class'], dtype=int)
+        Y_preprocess = pd.get_dummies(y, columns=['class'], dtype=int)
         I, K = Y.shape
 
         self.rX = X
         ''' TO-DO preprocess for X'''
-
         self.rY, self.rY_mean, self.rY_std = self.preprocess(0, Y)
 
-        self.plsT, self.plsP, self.plsQ, self.plsW = self.plsnipals(X, Y)
+        self.plsT, self.plsP, self.plsQ, self.plsW = self.plsnipals(self.rX, self.rY)
 
         Ypred = self.plsT @ self.plsQ.T
         self.YpredT, self.YpredP, _ = self.decomp(Ypred)
 
+        self.YpredT = -self.YpredT
+        self.YpredP = -self.YpredP
+
+        """ TO-DO -- HARD """
+        E = np.eye(K)
+        E = self.preprocess_newset(E)
+        self.centers = E @ self.YpredP
+
+        self.distances_soft = np.zeros(Ypred.shape)
+        for k in range(K):
+            for i in range(I):
+                self.distances_soft[i][k] = self.mahdis(self.YpredT[i, :], self.centers[k, :],
+                                                        self.YpredT[Y.loc[Y.iloc[:, k].isin([1])].index, :])
+
     def preprocess(self, mode, XTest1):
         _, Nx = XTest1.shape
-        XTest = XTest1
+        XTest = XTest1.copy()
 
         # center
         if mode == 0:
@@ -68,6 +83,9 @@ class PlsDa:
         if mode == 2:
             ''' TO-DO '''
             pass
+
+        self.training_set_mean = Mean
+        self.training_set_std = Std
 
         return XTest, Mean, Std
 
@@ -129,3 +147,26 @@ class PlsDa:
         Eig = D[:self.n_comps_pca, :self.n_comps_pca]
 
         return T, P, Eig
+
+    def preprocess_newset(self, XTest1):
+        self.training_set_mean = self.training_set_mean.to_numpy()
+        self.training_set_mean = self.training_set_mean.reshape((1, -1))
+        XTest1 = np.subtract(XTest1, self.training_set_mean)
+
+        self.training_set_std = self.training_set_std.to_numpy()
+        self.training_set_std = self.training_set_std.reshape((1, -1))
+        XTest1 = np.divide(XTest1, self.training_set_std)
+
+        return XTest1
+
+    def mahdis(self, t, c, Tk):
+        m = Tk.shape[0]
+        nor = np.subtract(t, c)
+
+        centr = np.subtract(Tk, c)
+        centr = centr / math.sqrt(m)
+
+        mat = centr.T @ centr
+        nor = nor.reshape((1, -1))
+        res = (np.dot(nor, np.linalg.pinv(mat))) @ nor.T
+        return res[0][0]
