@@ -12,4 +12,4 @@ if __name__ == '__main__':
 
     plsda = PlsDa(ncomps_pls=12, alpha=0.05, gamma=0.01)
     plsda.fit(X, y)
-
+    plsda.classification_plot()

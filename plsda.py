@@ -1,6 +1,10 @@
 import numpy as np
 import pandas as pd
 import math
+import matplotlib.pyplot as plt
+
+from scipy.stats.distributions import chi2
+
 
 class PlsDa:
 
@@ -170,3 +174,84 @@ class PlsDa:
         nor = nor.reshape((1, -1))
         res = (np.dot(nor, np.linalg.pinv(mat))) @ nor.T
         return res[0][0]
+
+    def classification_plot(self):
+        pc1 = 0
+        pc2 = 1
+
+        Y = pd.get_dummies(self.training_classes, columns=['class'], dtype=int)
+        trc = np.unique(self.training_classes)
+        K = Y.shape[1]
+
+        for cl in range(K):
+            temp = self.YpredT[Y.loc[Y.iloc[:, cl].isin([1])].index, :]
+
+            if pc1 != pc2:
+                plt.scatter(temp[:, pc1], temp[:, pc2], marker='o')
+                # plt.plot()
+
+        centers_ = np.array(list(zip(self.centers[:, pc1], self.centers[:, pc2])))
+        if pc1 == 1 and pc2 == 1:
+            centers_ = self.centers
+
+        """ TO-DO -- HARD """
+
+        """ SOFT CASE """
+        YpredT_ = np.array(list(zip(self.YpredT[:, pc1], self.YpredT[:, pc2])))
+        if pc1 == 1 and pc2 == 1:
+            YpredT_ = self.YpredT
+
+        self.soft_plot(YpredT_, Y, centers_, K)
+
+        # plt.show()
+
+    def soft_plot(self, YpredT, Y, Centers, K):
+
+        for cl in range(K):
+            self.soft_classes_plot(self.YpredT[Y.loc[Y.iloc[:, cl].isin([1])].index, :],
+                                   Centers[cl, :], K)
+
+            if self.n_comps_pca == 1:
+                pass
+            else:
+                pass
+
+            break
+
+    def soft_classes_plot(self, pcaScoresK, Center, K):
+        len = pcaScoresK.shape[0]
+        cov = np.linalg.inv((np.subtract(pcaScoresK, np.tile(Center, (len, 1))).T @
+                             np.subtract(pcaScoresK, np.tile(Center, (len, 1)))) / len)
+
+        if self.n_comps_pca > 1:
+            _, P, Eig = self.decomp(cov)
+            P = -P
+            SqrtSing = np.diag(np.sqrt(Eig)).T
+        else:
+            SqrtSing = np.sqrt(cov)
+
+        if self.n_comps_pca > 1:
+            fi = np.zeros(91)
+
+            for i in range(1, 91):
+                fi[i] = np.pi / 45 + fi[i - 1]
+
+            xy = np.array(list(zip(np.divide(np.cos(fi).T, SqrtSing[0]), np.divide(np.sin(fi).T, SqrtSing[1]))))
+            J = np.array(list(range(1, xy.shape[0] + 1)))
+            pc = xy @ P
+        else:
+            """ TO-DO """
+            pass
+
+        sqrtchi = np.sqrt(chi2.ppf(1 - self.alpha, K - 1))
+
+        if self.n_comps_pca == 1:
+            Center = np.append(Center, 0)  # to check
+
+        AcceptancePlot = (pc * sqrtchi) + np.tile(Center, (xy.shape[0], 1))
+
+        if self.gamma:
+            Dout = np.sqrt(chi2.ppf(np.power(1 - self.gamma, 1 / len), K - 1))
+            OutliersPlot = (pc * Dout) + np.tile(Center, (xy.shape[0], 1))
+
+        return AcceptancePlot, OutliersPlot
