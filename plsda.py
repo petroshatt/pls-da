@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
+from matplotlib import cm
 
 from scipy.stats.distributions import chi2
 
@@ -207,16 +208,34 @@ class PlsDa:
 
     def soft_plot(self, YpredT, Y, Centers, K):
 
+        plt.title("Classification Plot")
+        plt.xlabel("sPC 1")
+        plt.ylabel("sPC 2")
+
+        color = iter(cm.viridis(np.linspace(0, 1, K)))
+
         for cl in range(K):
-            self.soft_classes_plot(self.YpredT[Y.loc[Y.iloc[:, cl].isin([1])].index, :],
-                                   Centers[cl, :], K)
+            c = next(color)
+            AcceptancePlot, OutliersPlot = self.soft_classes_plot(self.YpredT[Y.loc[Y.iloc[:, cl].isin([1])].index, :],
+                                                                  Centers[cl, :], K)
 
             if self.n_comps_pca == 1:
                 pass
             else:
-                pass
+                plt.plot(AcceptancePlot[:, 0], AcceptancePlot[:, 1], c=c)
 
-            break
+            if self.gamma:
+                if self.n_comps_pca == 1:
+                    pass
+                else:
+                    plt.plot(OutliersPlot[:, 0], OutliersPlot[:, 1], c=c)
+
+            temp_c = Centers[cl, :]
+            if self.n_comps_pca == 1:
+                temp_c = np.append(temp_c, 0)  # to check
+            plt.plot(temp_c[0], temp_c[1], 'm')
+
+        plt.show()
 
     def soft_classes_plot(self, pcaScoresK, Center, K):
         len = pcaScoresK.shape[0]
